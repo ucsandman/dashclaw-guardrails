@@ -1,0 +1,38 @@
+version: 1
+project: openclaw-demo
+policies:
+  - id: external_send_requires_approval
+    description: Any external send must require approval
+    applies_to:
+      tools:
+        - message.send
+        - email.send
+    rule:
+      require: approval
+    tests:
+      - name: blocks_without_approval
+        input:
+          tool: message.send
+          args:
+            target: someone
+            message: hi
+          approval: false
+        expect:
+          allowed: false
+
+  - id: destructive_fs_blocked
+    description: Deleting files is blocked unless allowlisted
+    applies_to:
+      tools:
+        - fs.delete
+        - exec.rm
+    rule:
+      block: true
+    tests:
+      - name: blocks_delete
+        input:
+          tool: fs.delete
+          args:
+            path: /tmp/whatever
+        expect:
+          allowed: false

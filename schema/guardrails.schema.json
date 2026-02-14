@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "dashclaw-guardrails policy",
+  "type": "object",
+  "required": ["version", "policies"],
+  "properties": {
+    "version": { "type": "integer", "enum": [1] },
+    "project": { "type": "string" },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "description", "applies_to", "rule"],
+        "properties": {
+          "id": { "type": "string", "minLength": 3 },
+          "description": { "type": "string" },
+          "applies_to": {
+            "type": "object",
+            "properties": {
+              "tools": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          },
+          "rule": {
+            "type": "object",
+            "properties": {
+              "require": { "type": "string", "enum": ["approval"] },
+              "block": { "type": "boolean" },
+              "allowlist": { "type": "array", "items": { "type": "string" } }
+            },
+            "additionalProperties": false
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "input", "expect"],
+              "properties": {
+                "name": { "type": "string" },
+                "input": { "type": "object" },
+                "expect": { "type": "object" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

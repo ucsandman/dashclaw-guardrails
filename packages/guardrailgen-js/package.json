@@ -1,0 +1,14 @@
+{
+  "name": "@dashclaw/guardrailgen",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "guardrailgen": "./bin/guardrailgen.js"
+  },
+  "scripts": {
+    "test": "node ./bin/guardrailgen.js --help"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}
