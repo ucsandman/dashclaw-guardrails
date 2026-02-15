@@ -5,6 +5,8 @@ import yaml from 'js-yaml';
 import { generateJestTests, generatePackageJson, generateJestConfig } from '../src/generators/jest.js';
 import { generatePytestTests, generateRequirementsTxt } from '../src/generators/pytest.js';
 import { generateMarkdownReport, generateJsonReport } from '../src/report.js';
+import { fetchPolicies, checkConnection } from '../src/adapters/dashclaw.js';
+import { convertPolicies } from '../src/converters/dashclaw-to-yaml.js';
 
 function usage() {
   console.log(`guardrailgen
@@ -12,7 +14,9 @@ function usage() {
 Commands:
   validate <guardrails.yml>
   generate --lang js|py --policy <guardrails.yml> --out <dir>
+  generate --lang js|py --dashclaw-url <url> --api-key <key> --out <dir>
   report --policy <guardrails.yml> [--out <path>] [--format md|json]
+  report --dashclaw-url <url> --api-key <key> [--out <path>] [--format md|json]
 `);
 }
 
@@ -52,6 +56,9 @@ if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
 }
 
 const cmd = args[0];
+
+// Wrap in async IIFE for async/await support
+(async () => {
 try {
   if (cmd === 'validate') {
     const file = args[1];
@@ -64,12 +71,42 @@ try {
 
   if (cmd === 'generate') {
     const opts = parseArgs(args.slice(1));
-    if (!opts.policy) throw new Error('--policy <guardrails.yml> required');
     if (!opts.out) throw new Error('--out <dir> required');
     if (!opts.lang) throw new Error('--lang js|py required');
     
-    const pol = loadPolicy(opts.policy);
-    validatePolicy(pol);
+    let pol;
+    let projectName = 'guardrails';
+    
+    // Option 1: Load from local YAML file
+    if (opts.policy) {
+      pol = loadPolicy(opts.policy);
+      validatePolicy(pol);
+    }
+    // Option 2: Fetch from DashClaw API
+    else if (opts['dashclaw-url'] && opts['api-key']) {
+      console.log(`Connecting to DashClaw at ${opts['dashclaw-url']}...`);
+      const checkResult = await checkConnection(opts['dashclaw-url'], opts['api-key']);
+      if (!checkResult.ok) {
+        throw new Error(`Failed to connect to DashClaw: ${checkResult.error}`);
+      }
+      console.log('✓ Connected to DashClaw');
+      
+      const policies = await fetchPolicies(opts['dashclaw-url'], opts['api-key']);
+      console.log(`✓ Fetched ${policies.length} policies`);
+      
+      projectName = opts.project || new URL(opts['dashclaw-url']).hostname.replace(/\./g, '-');
+      pol = convertPolicies(policies, projectName);
+      console.log(`✓ Converted to guardrailgen format (${pol.policies.length} active policies)`);
+      
+      // Save converted YAML for reference
+      const yamlPath = path.join(opts.out, 'dashclaw-policies.yml');
+      fs.mkdirSync(opts.out, { recursive: true });
+      fs.writeFileSync(yamlPath, yaml.dump(pol));
+      console.log(`✓ Saved policy YAML to ${yamlPath}`);
+    }
+    else {
+      throw new Error('Either --policy <file> OR --dashclaw-url <url> + --api-key <key> required');
+    }
     
     const outDir = opts.out;
     fs.mkdirSync(outDir, { recursive: true });
@@ -112,10 +149,25 @@ try {
 
   if (cmd === 'report') {
     const opts = parseArgs(args.slice(1));
-    if (!opts.policy) throw new Error('--policy <guardrails.yml> required');
     
-    const pol = loadPolicy(opts.policy);
-    validatePolicy(pol);
+    let pol;
+    
+    // Option 1: Load from local YAML file
+    if (opts.policy) {
+      pol = loadPolicy(opts.policy);
+      validatePolicy(pol);
+    }
+    // Option 2: Fetch from DashClaw API
+    else if (opts['dashclaw-url'] && opts['api-key']) {
+      console.log(`Fetching policies from DashClaw...`);
+      const policies = await fetchPolicies(opts['dashclaw-url'], opts['api-key']);
+      const projectName = opts.project || new URL(opts['dashclaw-url']).hostname.replace(/\./g, '-');
+      pol = convertPolicies(policies, projectName);
+      console.log(`✓ Converted ${pol.policies.length} active policies`);
+    }
+    else {
+      throw new Error('Either --policy <file> OR --dashclaw-url <url> + --api-key <key> required');
+    }
     
     const format = opts.format || 'md';
     let content;
@@ -144,3 +196,4 @@ try {
   console.error(String(e?.message || e));
   process.exit(1);
 }
+})();

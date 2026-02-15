@@ -54,12 +54,29 @@ policies:
 
 ### 3. Generate Tests
 
+**Option A: From local YAML file**
 ```bash
 node bin/guardrailgen.js generate \
   --lang js \
   --policy guardrails.yml \
   --out ./tests
 ```
+
+**Option B: From live DashClaw instance**
+```bash
+node bin/guardrailgen.js generate \
+  --lang js \
+  --dashclaw-url https://dash.example.com \
+  --api-key oc_live_xxxxx \
+  --out ./tests
+```
+
+This will:
+1. Connect to your DashClaw instance
+2. Fetch all active policies via API
+3. Convert them to guardrailgen format
+4. Generate runnable tests
+5. Save a copy of the converted policies as `dashclaw-policies.yml`
 
 ### 4. Run Tests
 
@@ -71,9 +88,18 @@ npm test
 
 ### 5. Generate Proof Report
 
+**From local YAML:**
 ```bash
 node bin/guardrailgen.js report \
   --policy guardrails.yml \
+  --out PROOF.md
+```
+
+**From DashClaw:**
+```bash
+node bin/guardrailgen.js report \
+  --dashclaw-url https://dash.example.com \
+  --api-key oc_live_xxxxx \
   --out PROOF.md
 ```
 
@@ -121,9 +147,10 @@ rule:
 - [x] Jest generator + evaluator
 - [x] Proof reports (MD + JSON)
 - [x] GitHub Actions template
+- [x] DashClaw integration (fetch policies via API)
 - [ ] Pytest generator
 - [ ] Advanced rules (rate limits, data boundaries)
-- [ ] DashClaw integration
+- [ ] DashClaw policy simulation (what-if analysis)
 
 ## Status
 
