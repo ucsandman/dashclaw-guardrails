@@ -142,12 +142,24 @@ rule:
   require: approval
 ```
 
+## Policy Cookbook
+
+Pre-built policy packs for common use cases. See [policies/README.md](policies/README.md).
+
+| Pack | Best For |
+|---|---|
+| [smb-safe](policies/smb-safe/) | Small businesses, first-time deployment |
+| [startup-growth](policies/startup-growth/) | Fast-moving teams, balanced security |
+| [enterprise-strict](policies/enterprise-strict/) | Regulated industries, compliance-driven |
+| [development](policies/development/) | Local dev, staging, prototyping |
+
 ## Roadmap
 
 - [x] Jest generator + evaluator
 - [x] Proof reports (MD + JSON)
 - [x] GitHub Actions template
 - [x] DashClaw integration (fetch policies via API)
+- [x] Policy Cookbook (4 pre-built packs)
 - [ ] Pytest generator
 - [ ] Advanced rules (rate limits, data boundaries)
 - [ ] DashClaw policy simulation (what-if analysis)

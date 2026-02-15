@@ -1,0 +1,118 @@
+version: 1
+project: smb-safe
+policies:
+  - id: external_comms_require_approval
+    description: All external communications (email, messaging) require human approval
+    applies_to:
+      tools:
+        - message.send
+        - email.send
+        - slack.post
+        - sms.send
+    rule:
+      require: approval
+    tests:
+      - name: blocks_message_without_approval
+        input:
+          tool: message.send
+          args:
+            target: customer@example.com
+            message: Following up on your inquiry
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_message_with_approval
+        input:
+          tool: message.send
+          args:
+            target: customer@example.com
+            message: Following up on your inquiry
+          approval: true
+        expect:
+          allowed: true
+
+      - name: blocks_email_without_approval
+        input:
+          tool: email.send
+          args:
+            to: vendor@example.com
+            subject: Invoice reminder
+          approval: false
+        expect:
+          allowed: false
+
+  - id: destructive_operations_blocked
+    description: File deletion and destructive commands are blocked
+    applies_to:
+      tools:
+        - fs.delete
+        - fs.rmdir
+        - exec.rm
+        - db.drop
+        - db.truncate
+    rule:
+      block: true
+    tests:
+      - name: blocks_file_delete
+        input:
+          tool: fs.delete
+          args:
+            path: /data/customers.csv
+        expect:
+          allowed: false
+
+      - name: blocks_db_drop
+        input:
+          tool: db.drop
+          args:
+            table: orders
+        expect:
+          allowed: false
+
+      - name: blocks_rm_command
+        input:
+          tool: exec.rm
+          args:
+            path: /var/log/app.log
+        expect:
+          allowed: false
+
+  - id: exec_commands_allowlist
+    description: Shell commands restricted to safe operations only
+    applies_to:
+      tools:
+        - exec.*
+    rule:
+      block: true
+      allowlist:
+        - exec.ls
+        - exec.cat
+        - exec.grep
+        - exec.find
+        - exec.echo
+    tests:
+      - name: blocks_unknown_exec
+        input:
+          tool: exec.curl
+          args:
+            url: http://example.com
+        expect:
+          allowed: false
+
+  - id: web_fetch_domain_allowlist
+    description: Web requests limited to approved domains
+    applies_to:
+      tools:
+        - web.fetch
+        - web.post
+    rule:
+      block: true
+    tests:
+      - name: blocks_unapproved_domain
+        input:
+          tool: web.fetch
+          args:
+            url: http://unknown-site.com/api
+        expect:
+          allowed: false

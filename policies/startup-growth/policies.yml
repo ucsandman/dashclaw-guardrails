@@ -1,0 +1,109 @@
+version: 1
+project: startup-growth
+policies:
+  - id: customer_facing_comms_require_approval
+    description: External communications to customers require approval, internal messages are allowed
+    applies_to:
+      tools:
+        - email.send
+        - sms.send
+    rule:
+      require: approval
+    tests:
+      - name: blocks_customer_email_without_approval
+        input:
+          tool: email.send
+          args:
+            to: customer@example.com
+            subject: Your order update
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_customer_email_with_approval
+        input:
+          tool: email.send
+          args:
+            to: customer@example.com
+            subject: Your order update
+          approval: true
+        expect:
+          allowed: true
+
+  - id: destructive_ops_require_approval
+    description: Destructive operations require approval instead of being blocked outright
+    applies_to:
+      tools:
+        - fs.delete
+        - fs.rmdir
+        - db.drop
+        - db.truncate
+    rule:
+      require: approval
+    tests:
+      - name: blocks_delete_without_approval
+        input:
+          tool: fs.delete
+          args:
+            path: /tmp/old-export.csv
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_delete_with_approval
+        input:
+          tool: fs.delete
+          args:
+            path: /tmp/old-export.csv
+          approval: true
+        expect:
+          allowed: true
+
+  - id: internal_messaging_allowed
+    description: Agent-to-agent and internal Slack messages are allowed without approval
+    applies_to:
+      tools:
+        - message.send
+        - slack.post
+    rule:
+      require: approval
+    tests:
+      - name: blocks_without_approval
+        input:
+          tool: message.send
+          args:
+            target: team-channel
+            message: Build complete
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_with_approval
+        input:
+          tool: message.send
+          args:
+            target: team-channel
+            message: Build complete
+          approval: true
+        expect:
+          allowed: true
+
+  - id: secrets_must_be_redacted
+    description: Content containing secrets or API keys must be blocked
+    applies_to:
+      tools:
+        - message.send
+        - email.send
+        - web.post
+        - slack.post
+    rule:
+      block: true
+    tests:
+      - name: blocks_content_with_secrets
+        input:
+          tool: message.send
+          args:
+            target: public-channel
+            message: "Use this key: sk-1234567890abcdef"
+        expect:
+          allowed: false

@@ -1,0 +1,58 @@
+version: 1
+project: development
+policies:
+  - id: warn_on_destructive_ops
+    description: Warn (but do not block) on destructive file and database operations
+    applies_to:
+      tools:
+        - fs.delete
+        - fs.rmdir
+        - db.drop
+        - db.truncate
+    rule:
+      require: approval
+    tests:
+      - name: flags_file_delete
+        input:
+          tool: fs.delete
+          args:
+            path: /tmp/test-file.txt
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_with_approval
+        input:
+          tool: fs.delete
+          args:
+            path: /tmp/test-file.txt
+          approval: true
+        expect:
+          allowed: true
+
+  - id: block_production_access
+    description: Block any access to production databases or APIs
+    applies_to:
+      tools:
+        - db.query
+        - web.fetch
+        - web.post
+    rule:
+      block: true
+    tests:
+      - name: blocks_production_db_query
+        input:
+          tool: db.query
+          args:
+            connection: production
+            query: "SELECT * FROM users"
+        expect:
+          allowed: false
+
+      - name: blocks_production_api_call
+        input:
+          tool: web.post
+          args:
+            url: https://api.production.example.com/users
+        expect:
+          allowed: false

@@ -1,0 +1,152 @@
+version: 1
+project: enterprise-strict
+policies:
+  - id: all_external_comms_require_approval
+    description: Every external communication requires human approval with no exceptions
+    applies_to:
+      tools:
+        - message.send
+        - email.send
+        - slack.post
+        - sms.send
+        - web.post
+    rule:
+      require: approval
+    tests:
+      - name: blocks_email_without_approval
+        input:
+          tool: email.send
+          args:
+            to: partner@vendor.com
+            subject: Contract renewal
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_email_with_approval
+        input:
+          tool: email.send
+          args:
+            to: partner@vendor.com
+            subject: Contract renewal
+          approval: true
+        expect:
+          allowed: true
+
+      - name: blocks_webhook_without_approval
+        input:
+          tool: web.post
+          args:
+            url: https://api.partner.com/webhook
+            body: "{}"
+          approval: false
+        expect:
+          allowed: false
+
+  - id: all_destructive_operations_blocked
+    description: All destructive operations are blocked with no exceptions
+    applies_to:
+      tools:
+        - fs.delete
+        - fs.rmdir
+        - fs.write
+        - exec.rm
+        - exec.rmdir
+        - db.drop
+        - db.truncate
+        - db.delete
+    rule:
+      block: true
+    tests:
+      - name: blocks_file_delete
+        input:
+          tool: fs.delete
+          args:
+            path: /any/path
+        expect:
+          allowed: false
+
+      - name: blocks_file_write
+        input:
+          tool: fs.write
+          args:
+            path: /etc/config
+            content: modified
+        expect:
+          allowed: false
+
+      - name: blocks_db_delete
+        input:
+          tool: db.delete
+          args:
+            table: users
+            where: "id = 1"
+        expect:
+          allowed: false
+
+  - id: all_exec_commands_blocked
+    description: Shell command execution is completely blocked
+    applies_to:
+      tools:
+        - exec.*
+    rule:
+      block: true
+    tests:
+      - name: blocks_any_exec
+        input:
+          tool: exec.bash
+          args:
+            command: echo hello
+        expect:
+          allowed: false
+
+  - id: secrets_and_pii_blocked
+    description: Content containing secrets, PII, or sensitive data must be blocked
+    applies_to:
+      tools:
+        - message.send
+        - email.send
+        - web.post
+        - slack.post
+        - web.fetch
+    rule:
+      block: true
+    tests:
+      - name: blocks_content_with_secrets
+        input:
+          tool: web.post
+          args:
+            url: https://api.example.com
+            body: "Bearer sk-proj-1234567890"
+        expect:
+          allowed: false
+
+  - id: data_export_requires_approval
+    description: Any data export or download operation requires approval
+    applies_to:
+      tools:
+        - data.export
+        - data.download
+        - report.generate
+    rule:
+      require: approval
+    tests:
+      - name: blocks_export_without_approval
+        input:
+          tool: data.export
+          args:
+            format: csv
+            table: customers
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_export_with_approval
+        input:
+          tool: data.export
+          args:
+            format: csv
+            table: customers
+          approval: true
+        expect:
+          allowed: true
