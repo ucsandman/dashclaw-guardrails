@@ -1,0 +1,165 @@
+version: 1
+project: startup-growth
+description: >
+  Balanced policy pack for startups and growth-stage companies.
+  Allows more agent autonomy for speed while keeping guardrails
+  on high-risk actions. External comms are allowed for internal tools
+  but gated for customer-facing channels.
+
+policies:
+  # --- Customer-Facing Comms ---
+  - id: customer_comms_require_approval
+    description: Messages to customers or public channels require approval
+    applies_to:
+      tools:
+        - email.send
+        - email.reply
+        - support.reply
+        - social.post
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_customer_email
+        input:
+          tool: email.send
+          args: { to: "customer@gmail.com", subject: "Your order" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_support_reply
+        input:
+          tool: support.reply
+          args: { ticket_id: "T-1234", message: "We're on it" }
+          approval: true
+        expect:
+          allowed: true
+
+      - name: blocks_unapproved_social_post
+        input:
+          tool: social.post
+          args: { platform: "twitter", content: "New feature!" }
+          approval: false
+        expect:
+          allowed: false
+
+  # --- Internal Comms (Allowed) ---
+  - id: internal_comms_allowed
+    description: Internal Slack and Discord messages are allowed without approval
+    applies_to:
+      tools:
+        - slack.send
+        - discord.send
+        - message.send
+    rule:
+      block: false
+    tests:
+      - name: allows_slack_message
+        input:
+          tool: slack.send
+          args: { channel: "#engineering", message: "Deploy complete" }
+        expect:
+          allowed: true
+
+      - name: allows_discord_message
+        input:
+          tool: discord.send
+          args: { channel: "general", message: "standup notes" }
+        expect:
+          allowed: true
+
+  # --- Filesystem (Soft Protection) ---
+  - id: block_production_fs_delete
+    description: Deletion blocked, but file creation and editing allowed
+    applies_to:
+      tools:
+        - fs.delete
+        - fs.rm
+        - fs.rmdir
+    rule:
+      block: true
+    tests:
+      - name: blocks_file_delete
+        input:
+          tool: fs.delete
+          args: { path: "/app/data/users.db" }
+        expect:
+          allowed: false
+
+  # --- Payments ---
+  - id: payments_require_approval
+    description: Financial transactions need human approval
+    applies_to:
+      tools:
+        - payment.*
+        - billing.*
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_payment
+        input:
+          tool: payment.charge
+          args: { amount: 99, customer: "cust_123" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_billing
+        input:
+          tool: billing.create_invoice
+          args: { customer: "cust_123", amount: 299 }
+          approval: true
+        expect:
+          allowed: true
+
+  # --- Database ---
+  - id: block_destructive_db
+    description: DROP, TRUNCATE, and DELETE operations on databases are blocked
+    applies_to:
+      tools:
+        - db.drop
+        - db.truncate
+        - db.delete_table
+    rule:
+      block: true
+    tests:
+      - name: blocks_drop_table
+        input:
+          tool: db.drop
+          args: { table: "users" }
+        expect:
+          allowed: false
+
+      - name: blocks_truncate
+        input:
+          tool: db.truncate
+          args: { table: "orders" }
+        expect:
+          allowed: false
+
+  # --- Deployment ---
+  - id: deploy_requires_approval
+    description: Production deployments require human approval
+    applies_to:
+      tools:
+        - deploy.production
+        - deploy.push
+        - infra.apply
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_deploy
+        input:
+          tool: deploy.production
+          args: { service: "api", version: "2.1.0" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_deploy
+        input:
+          tool: deploy.production
+          args: { service: "api", version: "2.1.0" }
+          approval: true
+        expect:
+          allowed: true

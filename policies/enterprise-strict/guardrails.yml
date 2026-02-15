@@ -1,0 +1,248 @@
+version: 1
+project: enterprise-strict
+description: >
+  Maximum-security policy pack for enterprise and regulated industries.
+  Every external action requires approval. Destructive operations blocked
+  across the board. Designed for SOC2, HIPAA, and ISO 27001 environments
+  where auditability is non-negotiable.
+
+policies:
+  # --- All External Communication ---
+  - id: all_external_comms_require_approval
+    description: Every outbound communication requires human approval
+    applies_to:
+      tools:
+        - message.send
+        - email.send
+        - email.reply
+        - slack.send
+        - discord.send
+        - support.reply
+        - social.post
+        - sms.send
+        - webhook.send
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_email
+        input:
+          tool: email.send
+          args: { to: "partner@megacorp.com", subject: "Contract" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_email
+        input:
+          tool: email.send
+          args: { to: "partner@megacorp.com", subject: "Contract" }
+          approval: true
+        expect:
+          allowed: true
+
+      - name: blocks_unapproved_webhook
+        input:
+          tool: webhook.send
+          args: { url: "https://api.partner.com/notify", payload: {} }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: blocks_unapproved_sms
+        input:
+          tool: sms.send
+          args: { to: "+15551234567", body: "Verification code" }
+          approval: false
+        expect:
+          allowed: false
+
+  # --- All Filesystem Mutations ---
+  - id: block_all_fs_mutations
+    description: All file write, delete, and move operations are blocked
+    applies_to:
+      tools:
+        - fs.delete
+        - fs.rm
+        - fs.rmdir
+        - fs.write
+        - fs.move
+        - fs.rename
+        - exec.rm
+    rule:
+      block: true
+    tests:
+      - name: blocks_file_write
+        input:
+          tool: fs.write
+          args: { path: "/etc/config.yml", content: "malicious" }
+        expect:
+          allowed: false
+
+      - name: blocks_file_move
+        input:
+          tool: fs.move
+          args: { from: "/data/secrets.env", to: "/tmp/exfil" }
+        expect:
+          allowed: false
+
+      - name: blocks_delete
+        input:
+          tool: fs.delete
+          args: { path: "/data/audit-log.db" }
+        expect:
+          allowed: false
+
+  # --- All Code Execution ---
+  - id: block_all_code_execution
+    description: No shell commands or code evaluation permitted
+    applies_to:
+      tools:
+        - exec.*
+        - shell.*
+        - code.eval
+        - code.run
+    rule:
+      block: true
+    tests:
+      - name: blocks_shell
+        input:
+          tool: shell.run
+          args: { command: "whoami" }
+        expect:
+          allowed: false
+
+      - name: blocks_code_eval
+        input:
+          tool: code.eval
+          args: { language: "python", code: "import os; os.system('ls')" }
+        expect:
+          allowed: false
+
+  # --- All Database Mutations ---
+  - id: block_all_db_mutations
+    description: All database write operations are blocked (read-only access)
+    applies_to:
+      tools:
+        - db.drop
+        - db.truncate
+        - db.delete
+        - db.delete_table
+        - db.insert
+        - db.update
+        - db.alter
+    rule:
+      block: true
+    tests:
+      - name: blocks_insert
+        input:
+          tool: db.insert
+          args: { table: "users", data: { name: "test" } }
+        expect:
+          allowed: false
+
+      - name: blocks_update
+        input:
+          tool: db.update
+          args: { table: "users", where: { id: 1 }, set: { role: "admin" } }
+        expect:
+          allowed: false
+
+      - name: blocks_drop
+        input:
+          tool: db.drop
+          args: { table: "audit_logs" }
+        expect:
+          allowed: false
+
+  # --- Financial / Billing ---
+  - id: financial_actions_require_approval
+    description: All financial operations require approval with audit trail
+    applies_to:
+      tools:
+        - payment.*
+        - billing.*
+        - invoice.*
+        - refund.*
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_refund
+        input:
+          tool: refund.process
+          args: { order_id: "ORD-5678", amount: 150 }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_invoice
+        input:
+          tool: invoice.create
+          args: { customer: "ENT-001", amount: 50000 }
+          approval: true
+        expect:
+          allowed: true
+
+  # --- Infrastructure ---
+  - id: infra_changes_require_approval
+    description: All infrastructure and deployment changes require approval
+    applies_to:
+      tools:
+        - deploy.*
+        - infra.*
+        - dns.*
+        - cert.*
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_deploy
+        input:
+          tool: deploy.production
+          args: { service: "auth-service", version: "3.0.0" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: blocks_unapproved_dns
+        input:
+          tool: dns.update
+          args: { domain: "api.company.com", record: "A", value: "1.2.3.4" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_infra
+        input:
+          tool: infra.apply
+          args: { stack: "production", plan: "scale-up" }
+          context: { approved: true }
+        expect:
+          allowed: true
+
+  # --- Data Export / PII ---
+  - id: data_access_requires_approval
+    description: Any data export, download, or PII access requires approval
+    applies_to:
+      tools:
+        - data.export
+        - data.download
+        - data.query_pii
+        - report.export
+        - report.download
+    rule:
+      require: approval
+    tests:
+      - name: blocks_pii_query
+        input:
+          tool: data.query_pii
+          args: { fields: ["ssn", "email"], filter: { state: "CA" } }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_report
+        input:
+          tool: report.export
+          args: { report_id: "monthly-revenue", format: "pdf" }
+          approval: true
+        expect:
+          allowed: true

@@ -1,47 +1,60 @@
 # Development Policy Pack
 
-Minimal guardrails for local development. Agents can move fast, but production access is blocked.
+Permissive guardrails for local development and testing. Stay out of the way, catch catastrophic mistakes.
 
-## Philosophy
+## What's Included
 
-**Trust the developer, protect production.** During development, agents need freedom to experiment. The only hard rule: never touch production systems.
+| Policy | Type | Description |
+|--------|------|-------------|
+| `block_production_deploy` | Approval | Prod deploys still need a human |
+| `external_email_requires_approval` | Approval | Prevent accidental external emails |
+| `financial_always_gated` | Approval | Money moves always need approval |
+| `block_production_db_destructive` | Block | No DROP or TRUNCATE, even in dev |
 
-## Policies Included
+## What's NOT Blocked
 
-| Policy | Action | What It Does |
-|---|---|---|
-| `warn_on_destructive_ops` | Require Approval | Destructive ops need approval (safety net, not a wall) |
-| `block_production_access` | Block | Production DB queries and API calls are blocked |
+- File read/write/delete (you're developing, iterate freely)
+- Shell commands and code execution (the whole point of dev)
+- Internal messages (Slack, Discord)
+- Database reads, inserts, updates
+- Staging/dev deployments
 
-## Key Differences from Other Packs
+## Who This Is For
 
-- **Only 2 policies.** Minimal friction for development workflow.
-- **No messaging restrictions.** Send test messages freely.
-- **No exec restrictions.** Run any command locally.
-- **Production access is the only hard block.** Everything else is a warning or approval.
+- Engineers building and testing AI agent integrations
+- Local development environments
+- CI/CD pipelines (pair with `enterprise-strict` for production)
+- Anyone who wants a safety net without friction
 
-## When to Use
+## Design Philosophy
 
-- Local development and testing
-- Staging environments
-- Agent prototyping and experimentation
-- Hackathons and proof-of-concepts
+**Minimal gates, maximum velocity.** Only 4 policies, targeting the actions that are dangerous even during development:
+
+1. You can't accidentally deploy to production
+2. You can't accidentally email a client
+3. You can't accidentally charge a credit card
+4. You can't accidentally drop a database table
+
+Everything else is fair game.
 
 ## Quick Start
 
 ```bash
-guardrailgen generate \
-  --lang js \
-  --policy policies/development/policies.yml \
-  --out ./tests
-
-cd tests && npm install && npm test
+guardrailgen validate policies/development/guardrails.yml
+guardrailgen generate policies/development/guardrails.yml -o tests/development.test.js
+npx jest tests/development.test.js
 ```
 
-## Important
+## Pairing With Other Packs
 
-**Never deploy this pack to production.** It is intentionally permissive. Use `smb-safe`, `startup-growth`, or `enterprise-strict` for production environments.
+Use `development` locally, then layer on stricter packs per environment:
+
+```
+local:   development
+staging: startup-growth
+prod:    enterprise-strict
+```
 
 ## Test Coverage
 
-2 policies, 4 test cases.
+4 policies, 10 test cases.

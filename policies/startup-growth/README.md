@@ -1,52 +1,40 @@
 # Startup-Growth Policy Pack
 
-Balanced guardrails for fast-moving teams. Protects customers and data without slowing down internal operations.
+Balanced guardrails for fast-moving teams. More agent autonomy where it's safe, strict gates where it matters.
 
-## Philosophy
+## What's Included
 
-**Protect what matters, don't block everything.** Startups need speed. These policies add approval gates for customer-facing actions and destructive operations, but let internal work flow freely.
+| Policy | Type | Description |
+|--------|------|-------------|
+| `customer_comms_require_approval` | Approval | Customer-facing emails, support replies, social posts gated |
+| `internal_comms_allowed` | Allow | Slack, Discord, internal messages flow freely |
+| `block_production_fs_delete` | Block | File deletion blocked, creation/editing allowed |
+| `payments_require_approval` | Approval | All financial transactions need sign-off |
+| `block_destructive_db` | Block | DROP, TRUNCATE, DELETE on databases blocked |
+| `deploy_requires_approval` | Approval | Production deploys need human approval |
 
-## Policies Included
+## Who This Is For
 
-| Policy | Action | What It Does |
-|---|---|---|
-| `customer_facing_comms_require_approval` | Require Approval | Customer emails and SMS need sign-off |
-| `destructive_ops_require_approval` | Require Approval | Deletions need sign-off (not blocked outright) |
-| `internal_messaging_allowed` | Require Approval | Internal messages need approval (customize per team) |
-| `secrets_must_be_redacted` | Block | Content with API keys/secrets is blocked |
+- Startups that want agents to move fast on internal work
+- Teams that need customer-facing actions gated but don't want to slow down engineering
+- Growth-stage companies balancing speed with accountability
 
-## Key Differences from SMB-Safe
+## Design Philosophy
 
-- Destructive operations require **approval** instead of being **blocked**
-- Internal messaging is separated from customer-facing comms
-- Secret/key detection is explicit (not just DLP scanning)
-- Fewer blanket restrictions, more targeted gates
+**Internal = trust.** Agents can message teammates, update internal docs, run read-only queries.
 
-## When to Use
+**External = verify.** Anything customer-facing, public, or financial gets a human in the loop.
 
-- Your team is moving fast and can't wait for approval on everything
-- You have internal agent-to-agent communication that should flow freely
-- You want to protect customers without blocking internal operations
-- You're scaling from 1-2 agents to a small fleet
+**Destructive = block.** No deleting files, dropping tables, or nuking data. Period.
 
 ## Quick Start
 
 ```bash
-guardrailgen generate \
-  --lang js \
-  --policy policies/startup-growth/policies.yml \
-  --out ./tests
-
-cd tests && npm install && npm test
+guardrailgen validate policies/startup-growth/guardrails.yml
+guardrailgen generate policies/startup-growth/guardrails.yml -o tests/startup-growth.test.js
+npx jest tests/startup-growth.test.js
 ```
-
-## Customization
-
-**Common adjustments:**
-- Remove `internal_messaging_allowed` if you want all messages to flow without approval
-- Add specific internal domains to an allowlist for `customer_facing_comms_require_approval`
-- Adjust `secrets_must_be_redacted` patterns for your specific key formats
 
 ## Test Coverage
 
-4 policies, 7 test cases.
+6 policies, 14 test cases.

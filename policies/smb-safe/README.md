@@ -1,49 +1,48 @@
 # SMB-Safe Policy Pack
 
-Conservative guardrails for small businesses running AI agents in production.
+Conservative guardrails for small and mid-size businesses. Strong defaults, minimal configuration.
 
-## Philosophy
+## What's Included
 
-**When in doubt, block it.** SMBs can't afford a rogue agent sending bad emails to customers or deleting important files. These policies prioritize safety over speed.
+| Policy | Type | Description |
+|--------|------|-------------|
+| `external_comms_require_approval` | Approval | All outbound messages/emails need human sign-off |
+| `block_destructive_fs` | Block | File deletion and removal operations blocked |
+| `block_arbitrary_code_exec` | Block | Shell/code execution blocked by default |
+| `financial_actions_require_approval` | Approval | Payments, billing, invoices need approval |
+| `data_export_requires_approval` | Approval | Data exports need human sign-off |
 
-## Policies Included
+## Who This Is For
 
-| Policy | Action | What It Does |
-|---|---|---|
-| `external_comms_require_approval` | Require Approval | All outbound messages/emails need human sign-off |
-| `destructive_operations_blocked` | Block | File deletion, DB drops, and destructive commands are blocked |
-| `exec_commands_allowlist` | Block (with allowlist) | Only safe shell commands are permitted |
-| `web_fetch_domain_allowlist` | Block | Web requests limited to approved domains |
-
-## When to Use
-
-- You're deploying agents for the first time
-- Agents interact with customers (email, messaging)
-- You handle sensitive data (financial, medical, personal)
-- You want maximum safety with manual approval gates
+- Teams deploying AI agents for the first time
+- Businesses handling customer data or financial transactions
+- Anyone who wants safe defaults without writing policies from scratch
 
 ## Quick Start
 
-### Standalone (guardrailgen CLI)
 ```bash
-guardrailgen generate \
-  --lang js \
-  --policy policies/smb-safe/policies.yml \
-  --out ./tests
+# Validate the policy file
+guardrailgen validate policies/smb-safe/guardrails.yml
 
-cd tests && npm install && npm test
+# Generate tests
+guardrailgen generate policies/smb-safe/guardrails.yml -o tests/smb-safe.test.js
+
+# Run tests
+npx jest tests/smb-safe.test.js
+
+# Generate compliance proof
+guardrailgen report policies/smb-safe/guardrails.yml -o reports/smb-safe-proof.md
 ```
-
-### DashClaw Import
-Create each policy via the DashClaw API or dashboard UI. Map `require: approval` to `require_approval` policy type and `block: true` to `block_action_type`.
 
 ## Customization
 
-**Common adjustments:**
-- Add your domains to `web_fetch_domain_allowlist` by updating the allowlist
-- Add safe commands to `exec_commands_allowlist`
-- For internal-only messages (agent-to-agent), consider removing from `external_comms_require_approval`
+This pack is intentionally strict. To loosen specific policies:
+
+1. Copy `guardrails.yml` to your project
+2. Remove policies you don't need
+3. Add `allowlist` entries for trusted tools
+4. Re-run `guardrailgen validate` to confirm your changes are valid
 
 ## Test Coverage
 
-4 policies, 7 test cases. All tests verify both block and allow scenarios.
+5 policies, 11 test cases. All deterministic, no external dependencies.

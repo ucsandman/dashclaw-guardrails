@@ -1,0 +1,112 @@
+version: 1
+project: development
+description: >
+  Permissive policy pack for local development and testing.
+  Agents have wide autonomy for building, testing, and iterating.
+  Only truly dangerous actions (production deploys, external emails,
+  financial transactions) are gated. Designed to stay out of the way
+  while still catching catastrophic mistakes.
+
+policies:
+  # --- Production Safety Net ---
+  - id: block_production_deploy
+    description: Production deployments require approval even in dev
+    applies_to:
+      tools:
+        - deploy.production
+        - infra.apply
+    rule:
+      require: approval
+    tests:
+      - name: blocks_unapproved_prod_deploy
+        input:
+          tool: deploy.production
+          args: { service: "api", version: "0.1.0-alpha" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_prod_deploy
+        input:
+          tool: deploy.production
+          args: { service: "api", version: "0.1.0-alpha" }
+          approval: true
+        expect:
+          allowed: true
+
+  # --- External Email (Easy Accidents) ---
+  - id: external_email_requires_approval
+    description: External emails gated to prevent accidental sends during dev
+    applies_to:
+      tools:
+        - email.send
+        - email.reply
+    rule:
+      require: approval
+    tests:
+      - name: blocks_accidental_email
+        input:
+          tool: email.send
+          args: { to: "ceo@bigclient.com", subject: "test test test" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_email
+        input:
+          tool: email.send
+          args: { to: "teammate@company.com", subject: "PR ready" }
+          approval: true
+        expect:
+          allowed: true
+
+  # --- Financial (Always Gated) ---
+  - id: financial_always_gated
+    description: Financial actions are always gated, even in development
+    applies_to:
+      tools:
+        - payment.*
+        - billing.*
+        - refund.*
+    rule:
+      require: approval
+    tests:
+      - name: blocks_test_payment
+        input:
+          tool: payment.charge
+          args: { amount: 1, customer: "test_cust" }
+          approval: false
+        expect:
+          allowed: false
+
+      - name: allows_approved_test_payment
+        input:
+          tool: payment.charge
+          args: { amount: 1, customer: "test_cust" }
+          approval: true
+        expect:
+          allowed: true
+
+  # --- Production Database Protection ---
+  - id: block_production_db_destructive
+    description: DROP and TRUNCATE blocked (even devs make mistakes)
+    applies_to:
+      tools:
+        - db.drop
+        - db.truncate
+    rule:
+      block: true
+    tests:
+      - name: blocks_drop_table
+        input:
+          tool: db.drop
+          args: { table: "users" }
+        expect:
+          allowed: false
+
+      - name: blocks_truncate
+        input:
+          tool: db.truncate
+          args: { table: "sessions" }
+        expect:
+          allowed: false
