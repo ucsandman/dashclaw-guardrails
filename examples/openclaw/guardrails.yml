@@ -19,6 +19,27 @@ policies:
           approval: false
         expect:
           allowed: false
+      
+      - name: allows_with_approval
+        input:
+          tool: message.send
+          args:
+            target: someone
+            message: hi
+          approval: true
+        expect:
+          allowed: true
+      
+      - name: allows_email_with_context_approval
+        input:
+          tool: email.send
+          args:
+            to: user@example.com
+            subject: test
+          context:
+            approved: true
+        expect:
+          allowed: true
 
   - id: destructive_fs_blocked
     description: Deleting files is blocked unless allowlisted
@@ -34,5 +55,13 @@ policies:
           tool: fs.delete
           args:
             path: /tmp/whatever
+        expect:
+          allowed: false
+      
+      - name: blocks_rm_command
+        input:
+          tool: exec.rm
+          args:
+            path: /important/data
         expect:
           allowed: false

@@ -1,0 +1,65 @@
+name: Guardrails CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  guardrails-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install guardrailgen
+        run: |
+          cd packages/guardrailgen-js
+          npm install
+      
+      - name: Generate tests
+        run: |
+          cd packages/guardrailgen-js
+          node bin/guardrailgen.js generate \
+            --lang js \
+            --policy ../../examples/openclaw/guardrails.yml \
+            --out ../../ci-tests
+      
+      - name: Run guardrails tests
+        run: |
+          cd ci-tests
+          npm install
+          npm test
+      
+      - name: Generate proof report
+        if: always()
+        run: |
+          cd packages/guardrailgen-js
+          node bin/guardrailgen.js report \
+            --policy ../../examples/openclaw/guardrails.yml \
+            --out ../../ci-tests/PROOF.md
+      
+      - name: Upload proof artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardrails-proof
+          path: ci-tests/PROOF.md
+      
+      - name: Comment proof on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const proof = fs.readFileSync('ci-tests/PROOF.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🛡️ Guardrails Proof\n\n${proof}`
+            });
